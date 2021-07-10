@@ -1,4 +1,8 @@
-## Welcome to GitHub Pages
+## Welcome to PyPhm Pages
+
+The skeleton of PyPhm is automated created by cookiecutter.
+>> cookiecutter https://github.com/audreyr/cookiecutter-pypackage.git
+
 
 You can use the [editor on GitHub](https://github.com/lvyv/PyPhm/edit/main/docs/index.md) to maintain and preview the content for your website in Markdown files.
 
