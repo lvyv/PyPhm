@@ -5,10 +5,12 @@
 
 import unittest
 import matplotlib.pyplot as plt
+from adjustText import adjust_text
+from matplotlib import patches as mpatches
 from os import listdir
 from os.path import isfile, join
 from phm.modules import utils
-from phm.vibration import cluster
+from phm.vibration import cluster, mds
 
 
 class TestPhm(unittest.TestCase):
@@ -25,191 +27,178 @@ class TestPhm(unittest.TestCase):
         self.assertTrue(True)
 
 
-# if __name__ == "__main__":
-#     unittest.main()
+def analysis_ims():
+    mypath = '../../phm-model/hvac/data/'  # 'data/'
+    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-mypath = '../../phm-model/hvac/data/'  # 'data/'
-onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
+    # Set figure size for matplotlib
+    plt.rcParams['figure.figsize'] = [12, 6]
+    files = onlyfiles  # [0:6]
 
-# Set figure size for matplotlib
-plt.rcParams['figure.figsize'] = [10, 8]
-files = onlyfiles  # [0:6]
+    data = []
+    for file in files:
+        x = utils.load_dat(file, mypath)
+        data.append(x[0])
 
-data = []
-for file in files:
-    x = utils.load_dat(file, mypath)
-    # plt.plot(x[0])
-    data.append(x[0])
+    sr = 20480  # sample rate
+    ws = 2048  # window size
+    freqs, spectra = cluster.ts2fft(data, sr, ws)
+    cluster_, df = cluster.cluster_vectors(spectra, False)
 
-sr = 20480  # sample rate
-ws = 2048   # window size
-freqs, spectra = cluster.ts2fft(data, sr, 2048)
+    # plot frequencies cluster chart
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Frequency')
+    ax.set_ylabel('Frequency Domain (Spectrum) Magnitude')
+    ax.set_title('Frequency Domain Representation of Each Signal')
+    for idx, elem in enumerate(df['vectors']):
+        for el in elem:
+            ax.plot(freqs, spectra[el], c=df['color'][idx])
+    plt.show()
 
-cluster_, df = cluster.cluster_vectors(spectra, False)
+    df2 = mds.dev_age_compute(spectra, freqs, [28, 12, 52])
+    pos = mds.compute_mds_pos(spectra)
+    # set color for each points in df2
+    df2.loc[:, 'color'] = '#000000'
+    for idx, elems in enumerate(df['vectors']):
+        for el in elems:
+            df2.loc[el, 'color'] = df.loc[idx, 'color']
 
-fig, ax = plt.subplots()
-
-ax.set_xlabel('Frequency')
-ax.set_ylabel('Frequency Domain (Spectrum) Magnitude')
-ax.set_title('Frequency Domain Representation of Each Signal')
-
-for elem in spectra:
-    ax.plot(freqs, elem)
-
-plt.show()
-# in order to show the age of different round trips.
-# standard benchmark for rotation machine used to measure a new spectrum.
-# 1st 0 - 27
-# 2nd 28 - 39
-# 3rd 40 - 91
-# age_factor = 20
-# pt_size = list(range(28)) + list(range(12)) + list(range(52))
-# pt_size = [ (pt+1) * age_factor for pt in pt_size]
-#
-# fig2, ax2 = plt.subplots()
-# # for spectra_id, color in enumerate(['red','blue','green','cyan', 'magenta', 'yellow']):
-# categories = {}
-# for spectra_id in np.unique(clusterer.labels_): #range(K_cnt): #enumerate([1,1'blue','green','cyan', 'magenta', 'yellow']):
-#     mask = list(np.where(predictions==spectra_id)[0])
-#     categories[spectra_id] = mask
-#     for elem in mask:
-#         ax2.plot(freqs, spectra[elem],  c=colormap[spectra_id], alpha=0.5, label=f'K{spectra_id}-{onlyfiles[elem]}') # color=f'C{spectra_id}',
-# ax2.legend(ncol=3)
-# ax2.set_xlabel('Frequency')
-# ax2.set_ylabel('Frequency Domain (Spectrum) Magnitude')
-# predictions
-
-"""
-=========================
-Multi-dimensional scaling
-=========================
-
-An illustration of the rotation machine health model by viberation metric.
-Exploring->Clustering->MDS->Predicting.
-"""
-
-# Author: Awen <26896225@qq.com>
-# License: BSD
+    # plot mds scatter chart
+    plt.figure(1)
+    plt.axes([0., 0., 1., 1.])
+    plt.scatter(pos[:, 0], pos[:, 1], marker='.', edgecolors=df2.loc[:, 'color'], s=df2.loc[:, 'age'],
+                facecolors='none',
+                alpha=0.5, lw=1, label=df2.loc[:, 'color'])
+    hnds = []
+    for idx, el in enumerate(df['color']):
+        pop = mpatches.Patch(color=el, label=f'cluster:{df["cid"][idx]}, {df["vectors"][idx]}')
+        hnds.append(pop)
+    plt.legend(handles=hnds, prop={'size': 6})
+    txts = df[df['cid'] == -1]['vectors'][0]  # -1 point.
+    texts = [plt.text(pos[txt, 0], pos[txt, 1], txt) for txt in txts]
+    adjust_text(texts)
+    plt.show()
+    return
 
 
-print(__doc__)
-import numpy as np
+def analysis_cwru():
+    print('---start---')
+    sr = 12000
+    ws = 2048
 
-from matplotlib import pyplot as plt
-from matplotlib import patches as mpatches
-from matplotlib.collections import LineCollection
+    datumn = []
+    mypath = '../../phm-model/hvac/data/baseline/'
+    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-from sklearn import manifold
-from sklearn.metrics import euclidean_distances
-from sklearn.decomposition import PCA
+    chunksize = 20480
+    agelist = []
+    for i, item in enumerate(onlyfiles):
+        fractionlet = 0  # some segment is too short and should be drop out.
+        file = item.split('.')[0]
+        (de, fe) = utils.load_mat(file, mypath)
+        # segment by chunksize(default 20480)
+        for idx, subset in enumerate(range(0, len(de), chunksize)):
+            seg = de[subset: subset + chunksize]
+            if len(seg) > ws:
+                datumn.append(seg)
+                fractionlet += 1
+        agelist.append(fractionlet)  # each chunk contains idx+1 segments.
+    print(f'Total {len(datumn)} cnts of health points loaded.')
 
-similarities = euclidean_distances(spectra)
-vectors = np.array([list(vec) for vec in spectra])
+    mypath = '../../phm-model/hvac/data/fault/'  # 'data/fault/'
+    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
-mds = manifold.MDS(n_components=2, max_iter=3000, eps=1e-9,
-                   dissimilarity="precomputed", n_jobs=1)
-pos = mds.fit(similarities).embedding_
+    for i, item in enumerate(onlyfiles):
+        fractionlet = 0  # some segment is too short and should be drop out.
+        file = item.split('.')[0]
+        (de, fe) = utils.load_mat(file, mypath)
+        # segment by chunksize(default 20480)
+        for idx, subset in enumerate(range(0, len(de), chunksize)):
+            seg = de[subset: subset + chunksize]
+            if len(seg) > ws:
+                datumn.append(seg)
+                fractionlet += 1
+        agelist.append(fractionlet)  # each chunk contains idx+1 segments.
 
-# Rescale the data
-pos *= np.sqrt((vectors ** 2).sum()) / np.sqrt((pos ** 2).sum())
+    print('Total points(include health ones): ', len(datumn))
 
-# Rotate the data
-clf = PCA(n_components=2)
-vectors = clf.fit_transform(vectors)
+    frequencies, spectrum = cluster.ts2fft(datumn, sr, ws)
+    clusternew_, dfnew = cluster.cluster_vectors(spectrum, False)
 
-pos = clf.fit_transform(pos)
+    # plot frequencies cluster chart
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Frequency')
+    ax.set_ylabel('Frequency Domain (Spectrum) Magnitude')
+    ax.set_title('Frequency Domain Representation of Each Signal')
+    for idx, elem in enumerate(dfnew['vectors']):
+        for el in elem:
+            ax.plot(frequencies, spectrum[el], c=dfnew['color'][idx])
+    plt.show()
 
-fig = plt.figure(1)
-ax = plt.axes([0., 0., 1., 1.])
+    df2 = mds.dev_age_compute(spectrum, frequencies, agelist)  # should label at data reading phase.seg
+    pos = mds.compute_mds_pos(spectrum)
 
-plt.scatter(pos[:, 0], pos[:, 1], marker='.', edgecolors=colormap[predictions], s=pt_size, facecolors='none',
-            lw=1)  # , label=predictions[:]) lw=0,
+    print(f'MDS pos computed.')
 
-hnds = []
-for idx in np.unique(clusterer.labels_):
-    pop = mpatches.Patch(color=colormap[idx], label=f'Population:{idx}-{categories[idx]}')
-    hnds.append(pop)
-plt.legend(handles=hnds)
+    # set color for each points in df2
+    df2.loc[:, 'color'] = '#000000'
+    for idx, elems in enumerate(dfnew['vectors']):
+        for el in elems:
+            df2.loc[el, 'color'] = dfnew.loc[idx, 'color']
 
-
-start_idx, end_idx = np.where(pos)
-segments = [[vectors[ix, :], vectors[jy, :]]
-            for ix in range(len(pos)) for jy in range(len(pos))]
-values = np.abs(similarities)
-lc = LineCollection(segments,
-                    zorder=0, cmap=plt.cm.Blues,
-                    norm=plt.Normalize(0, values.max()))
-lc.set_array(similarities.flatten())
-lc.set_linewidths(np.full(len(segments), 0.05))
-ax.add_collection(lc)
-
-plt.show()
-
-"""
-=========================
-Predicting
-=========================
-
-An illustration of the rotation machine health model by viberation metric.
-Exploring->Clustering->MDS->Predicting.
-"""
-
-# Author: Awen <26896225@qq.com>
-# License: BSD
-
-
-print(__doc__)
-
-import scipy.io
-from os import listdir
-from os.path import isfile, join
-
-datumn = []
-
-mypath = '../../phm-model/hvac/data/baseline/'  # 'data/baseline/'
-onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-for i, item in enumerate(onlyfiles):
-    file = item.split('.')[0]
-    print(file)
-    (de, fe) = load_mat(file, mypath)
-    datumn.append(de)
-
-mypath = '../../phm-model/hvac/data/fault/'  # 'data/fault/'
-onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-
-for i, item in enumerate(onlyfiles):
-    file = item.split('.')[0]
-    print(file)
-    (de, fe) = load_mat(file, mypath)
-    datumn.append(de)
+    # plot mds scatter chart
+    plt.figure(1)
+    plt.axes([0., 0., 1., 1.])
+    print(f'Total {len(agelist)} cnts of health points loaded.')
+    collections = list(range(len(pos)))
+    mask = dfnew[dfnew['cid'] == -1]['vectors'][0]
+    dispindices = list(set(collections).difference(set(mask)))
+    plt.scatter(x=pos[dispindices, 0],
+                y=pos[dispindices, 1],
+                s=df2.loc[dispindices, 'age'],
+                label=df2.loc[dispindices, 'color'],
+                edgecolors=df2.loc[dispindices, 'color'],
+                facecolors='none', marker='.', alpha=0.5, lw=1)
+    hnds = []
+    for idx, el in enumerate(dfnew['color']):
+        pop = mpatches.Patch(color=el, label=f'cluster:{dfnew["cid"][idx]}, {len(dfnew["vectors"][idx])}')
+        hnds.append(pop)
+    plt.legend(handles=hnds, prop={'size': 6})
+    # label baseline points
+    # baseline should be the first points
+    # agelist = [24, 12, 24, 24, 6, ...]
+    # dfnew:
+    #       cid,       vectors
+    #        -1     [84,85,86,87, ...]
+    #         0     [156,157, ...]
+    #        ...
+    #         8     [0,1,2, ...]
+    # should label points: 0, 24, 36, 60
+    blcnts = 3
+    baselineclass = [0]
+    for idx, el in enumerate(agelist[0: blcnts]):
+        ps = baselineclass[idx] + el
+        baselineclass.append(ps)
+    # find baselineclass leader points in dfnew and
+    texts = []
+    for obj in baselineclass:   # 0, 24, 36, 60
+        for idx, vecs in enumerate(dfnew['vectors']):
+            if obj in vecs:
+                txt = dfnew['cid'][idx]
+                texts.append(plt.text(pos[obj, 0], pos[obj, 1], txt))
+    adjust_text(texts)
+    # try:
+    #     txts = dfnew[dfnew['cid'] == -1]['vectors'][0]  # -1 point.
+    #     texts = [plt.text(pos[txt, 0], pos[txt, 1], txt) for txt in txts]
+    #     adjust_text(texts)
+    # except KeyError as ke:
+    #     print(ke)
+    #     pass
+    plt.show()
+    print('---over---')
 
 
-sr = 12000
-spec = []
-
-test_points = []
-
-for idx,sig in enumerate(datumn):
-    X = signal.welch(sig, fs=sr, scaling='density', nperseg=2048)
-    test_points.append(np.abs(X[1]))
-
-tps = np.array([  list(vec)    for vec in test_points])
-# test_labels, strengths = hdbscan.approximate_predict(clusterer, tps)
-
-import hdbscan
-
-dat = np.array([  list(vec)    for vec in test_points])
-clusterer = hdbscan.HDBSCAN(min_cluster_size=2, prediction_data=True).fit(dat)
-predictions = clusterer.labels_
-
-from sklearn import manifold
-from sklearn.metrics import euclidean_distances
-
-newpts = test_points
-
-similarities = euclidean_distances(newpts)
-
-mds = manifold.MDS(n_components=2, max_iter=3000, eps=1e-9,
-                   dissimilarity="precomputed", n_jobs=1)
-pos = mds.fit(similarities).embedding_
-
+if __name__ == "__main__":
+    # unittest.main()
+    # analysis_ims()
+    analysis_cwru()

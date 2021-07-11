@@ -21,7 +21,7 @@ cluster module
 =========================
 
 An illustration of the rotation machine health model by viberation metric.
-Common ultilities function.
+Cluster and fft functions.
 """
 
 # Author: Awen <26896225@qq.com>
@@ -100,15 +100,25 @@ def cluster_vectors(vectors, predict=True):
     # https://jdherman.github.io/colormap/
     # ['#35ffcc', '#7cdc66', '#c3b900', '#e15d61', '#ff00c3', '#df5ee1', '#bfbbff', '#7ddde0', '#000000']
     # The last color is set black for outliers.
-    cm = np.array(['#ff003b', '#ef084d', '#de105f', '#ce1871', '#bd2084', '#ac2896', '#9b30a8', '#8b38ba', '#7c42ca',
-                   '#7353d1', '#6b64d8', '#6375df', '#5a86e6', '#5297ed', '#4aa8f4', '#41b9fb', '#4abeef', '#63b5ce',
-                   '#7cadad', '#95a48c', '#ae9b6b', '#c7934a', '#e08a29', '#f98208', '#e78005', '#c6800c', '#a58013',
-                   '#84801b', '#638022', '#428029', '#218030', '#000000'])
+    # cm = np.array(['#ff003b', '#ef084d', '#de105f', '#ce1871', '#bd2084', '#ac2896', '#9b30a8', '#8b38ba', '#7c42ca',
+    #                '#7353d1', '#6b64d8', '#6375df', '#5a86e6', '#5297ed', '#4aa8f4', '#41b9fb', '#4abeef', '#63b5ce',
+    #                '#7cadad', '#95a48c', '#ae9b6b', '#c7934a', '#e08a29', '#f98208', '#e78005', '#c6800c', '#a58013',
+    #                '#84801b', '#638022', '#428029', '#218030', '#000000'])
+    cm = np.array(['#ff3c00', '#df3421', '#be2d42', '#9d2563', '#7c1d84', '#5b15a5', '#3a0ec6', '#1906e7',
+                   '#0108f8', '#0129d7', '#014ab6', '#006b95', '#008c74', '#00ad53', '#00ce32', '#00ef11',
+                   '#0def0c', '#26ce25', '#3fad3e', '#588c56', '#716b6f', '#8a4a87', '#a329a0', '#bc08b9',
+                   '#c212ac', '#c22b94', '#c2437b', '#c25c63', '#c2754a', '#c38d31', '#c3a619', '#c3be00'])
     dat = np.array([list(vec) for vec in vectors])
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=6, prediction_data=predict).fit(dat)
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=10, prediction_data=predict).fit(dat)
     cids = np.unique(clusterer.labels_)
     labels = clusterer.labels_
     df = pd.DataFrame(cids, columns=['cid'])
-    df['color'] = [cm[x] for x in cids]  # cluster count should not be two great.
+    cl = []
+    iii = 0
+    # assign color to each cluster
+    for idx in range(len(cids)):
+        cl = cl + [cm[iii % 32]]
+        iii += 3
+    df['color'] = cl
     df['vectors'] = [list(np.where(labels == sid)[0]) for sid in cids]
     return clusterer, df

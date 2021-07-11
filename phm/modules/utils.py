@@ -29,6 +29,7 @@ Common ultilities function.
 
 import pandas as pd
 import scipy.fftpack
+import scipy.io
 
 
 def load_dat(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
