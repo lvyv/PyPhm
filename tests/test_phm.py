@@ -200,5 +200,5 @@ def analysis_cwru():
 
 if __name__ == "__main__":
     # unittest.main()
-    # analysis_ims()
-    analysis_cwru()
+    analysis_ims()
+    # analysis_cwru()
