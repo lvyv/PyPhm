@@ -1,6 +1,6 @@
 ## Welcome to PyPhm Pages
 
-The skeleton of PyPhm is automated created by cookiecutter.
+The skeleton of PyPhm is created by cookiecutter.
 >> cookiecutter https://github.com/audreyr/cookiecutter-pypackage.git
 
 ### CWRU bearing datasets
