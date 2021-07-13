@@ -9,11 +9,9 @@ from matplotlib import patches as mpatches
 from datetime import datetime
 from os import listdir
 from os.path import isfile, join
-from modules import utils
-from vibration import cluster, mds
+from phm.modules import utils
+from phm.vibration import cluster, mds
 import unittest
-
-BENCHPATH = '../phm-model/hvac/data/'
 
 
 def get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et):
@@ -75,13 +73,15 @@ def safe_open_w(path):
 
 
 def retrieve_url_file(url, localfile):
+    # print(url)
     r = requests.get(url)
-    with safe_open_w(localfile) as f:
-        f.write(r.content)
+    if r.status_code == 200:
+        with safe_open_w(localfile) as f:
+            f.write(r.content)
     return r.status_code
 
 
-def fre2soh(url, benchpath, cachepath='.cache/data/'):
+def fre2mds(url, benchpath, cachepath='.cache/data/'):
     """
     Determines soh according the given wave file.
 
@@ -101,25 +101,11 @@ def fre2soh(url, benchpath, cachepath='.cache/data/'):
     out : float
         Float result of SOH calculated by the frequency analysis model.
 
-    See Also
-    --------
-    cop2soh
-
-    Examples
-    --------
-    >>> np.issctype(np.int32)
-    True
-
     """
     sr = 20480  # sample rate
     ws = 2048  # window size
 
-    # 1.download the dat file if necessary.
-    fn = url.rsplit('/', 1)[-1]
-    local = f'{cachepath}{fn}'
-    if not os.path.exists(local):
-        retrieve_url_file(url, local)
-    # 2.read benchamark data files
+    # 1.read benchamark data files
     datumn = []
     mypath = benchpath
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
@@ -138,7 +124,13 @@ def fre2soh(url, benchpath, cachepath='.cache/data/'):
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
     agelist = [28, 12, 52]  # FIXME: The benchmark datasets originally include three run to failure tests.
     objpos = len(datumn)    # This position should be used to plot object sample.
-    print(f'Benchmark data read {objpos} cnts of points.')
+    print(f'1.Benchmark data read: {objpos}')
+
+    # 2.download the dat file if necessary.
+    fn = url.rsplit('/', 1)[-1]
+    local = f'{cachepath}{fn}'
+    if not os.path.exists(local):
+        retrieve_url_file(url, local)
 
     # 3.read obj data files
     mypath = cachepath  # Obj data from url, cached in local .cache directory.
@@ -154,7 +146,7 @@ def fre2soh(url, benchpath, cachepath='.cache/data/'):
                 datumn.append(seg)
                 fractionlet += 1
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-    print('Total points(include obj ones): ', len(datumn))
+    print(f'2.Total points(include obj ones): {len(datumn)}')
 
     # 4.fft and cluster
 
@@ -164,18 +156,17 @@ def fre2soh(url, benchpath, cachepath='.cache/data/'):
     df2 = mds.dev_age_compute(spectrum, frequencies, agelist)  # should label at data reading phase.seg
     pos = mds.compute_mds_pos(spectrum)
 
-    print(f'MDS pos computed.')
-
     # set color for each points in df2
     df2.loc[:, 'color'] = '#000000'
     for idx, elems in enumerate(dfnew['vectors']):
         for el in elems:
             df2.loc[el, 'color'] = dfnew.loc[idx, 'color']
+    print(f'3.MDS pos computed.')
 
     # plot mds scatter chart
     plt.figure(1)
     plt.axes([0., 0., 1., 1.])
-    print(f'Total {len(agelist)} cnts samples loaded.')
+    # print(f'Total {len(agelist)} cnts samples loaded.')
     # collections = list(range(len(pos)))
     # mask = dfnew[dfnew['cid'] == -1]['vectors'][0]
     # dispindices = list(set(collections).difference(set(mask)))
@@ -214,42 +205,36 @@ def fre2soh(url, benchpath, cachepath='.cache/data/'):
                 txt = f'{obj} in C: [{dfnew["cid"][idx]}]'
                 texts.append(plt.text(pos[obj, 0], pos[obj, 1], txt))
     adjust_text(texts)
-
+    # label object points
     plt.scatter(x=pos[objpos:, 0],
                 y=pos[objpos:, 1],
                 label=df2.loc[objpos:, 'color'],
                 marker='*', s=300, color='k', alpha=0.5, lw=1)
-
     for txt in list(range(objpos, len(datumn))):
         plt.text(pos[txt, 0], pos[txt, 1], f'PT: {txt}', c='#000000')
-
     plt.show()
-    print('---over---')
+    print('4.MDS plot finished.')
     df2.drop(df2.columns[list(range(len(df2.T)-3))], axis=1, inplace=True)
     df2['pos_x'] = pos[:, 0]
     df2['pos_y'] = pos[:, 1]
     df2['shape'] = 0
     df2.loc[objpos:, 'shape'] = 1
     json.loads(df2.to_json())
-    # return 1
-    return json.loads(df2.to_json())    # return a dict object of json format
+    print('5.Return to main procedure.')
+    return df2.to_json()    # return a valid json string
 
 
-def wrap_soh(df):
+def wrap_mds(df, base):
     ret = []
     for index, row in df.iterrows():
-        item = {"ts": row['ts'], "SOH": fre2soh(row[1], BENCHPATH)}
+        item = {"ts": row['ts'], "MDS": fre2mds(row[1], base)}
         ret.append(item)
-
-    # soh = pd.Series(
-    #     data={"ts": 1209820000000, "SOH": 1})
-    # return soh.astype('float')  # FIXME
     return ret
 
 
-def calculate_soh_indicator(modelparam):
+def calculate_mds_indicator(modelparam, bp):
+    idx = None
     try:
-        idx = None
         iot = modelparam['iot']
         usr = modelparam['usr']
         pwd = modelparam['pwd']
@@ -264,8 +249,8 @@ def calculate_soh_indicator(modelparam):
         df = get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et)
 
         if not (df is None):
-            if modelparam['obj'] == 'SOH':
-                idx = wrap_soh(df)
+            if modelparam['obj'] == 'MDS':
+                idx = wrap_mds(df, bp)
     except ValueError as ve:
         print('Exception occured.', ve)
         pass
@@ -412,7 +397,7 @@ def compute_mdsdata(benchpath, objpath):
 
 class Tests(unittest.TestCase):
     def testCache(self):
-        self.assert_()
+        self.assert_(True)
 
 
 if __name__ == "__main__":

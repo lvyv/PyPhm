@@ -63,12 +63,17 @@ def ts2fft(datumn, samplerate, nperseg):
     --------
     >>>
     """
-    fre = None
-    spectrum_list = []
-    # Because frequency domain is symmetrical, take only positive frequencies
-    for idx, sig in enumerate(datumn):
-        fre, amp = signal.welch(sig, fs=samplerate, scaling='density', nperseg=nperseg)
-        spectrum_list.append(np.abs(amp))
+    try:
+        fre = None
+        spectrum_list = []
+        # Because frequency domain is symmetrical, take only positive frequencies
+        for idx, sig in enumerate(datumn):
+            fre, amp = signal.welch(sig, fs=samplerate, scaling='density', nperseg=nperseg)
+            spectrum_list.append(np.abs(amp))
+    except BaseException as err:
+        print(err)
+        fre = None
+        spectrum_list = []
     return fre, spectrum_list
 
 

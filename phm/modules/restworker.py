@@ -37,7 +37,7 @@ app_ = FastAPI(
 
 class ComboIndicatorItem(BaseModel):
     reconnectmqtt: bool = True          # 是否每次重连mqtt，0为否
-    obj: str = 'SOH'                    # 组合指标名称
+    obj: str = 'MDS'                    # 组合指标名称
     stime: datetime = start_            # 时间窗口起点
     etime: datetime = start_ + delt_    # 时间窗口终点
     iot: str = IOTuri_
@@ -50,7 +50,7 @@ class ComboIndicatorItem(BaseModel):
     token: str = IOTtok_
     port: Optional[int] = IOTmqpt_
 
-    keys: str = 'wave_url,SOH'
+    keys: str = 'wave_url,MDS'
 
 
 class MqttItem(BaseModel):
@@ -79,7 +79,7 @@ def run(pt):
     uvicorn.run(app_, host="0.0.0.0", port=pt)
 
 
-@app_.post("/api/mdsdata")
+# @app_.post("/api/mdsdata")  # just for test pupose
 async def mdsdata(item: ComboIndicatorItem):
     cmd = item.dict()
     # FIXME:要检查是否传入合适的obj,src,stime,etime
@@ -89,7 +89,7 @@ async def mdsdata(item: ComboIndicatorItem):
     # phm.compute_mdsdata('../phm-model/hvac/data/', 'http://127.0.0.1/archive/1st_test/1st_test/2003.10.23.00.14.13')
     jso = ret.to_json()
     # pipe_.send(json.dumps(cmd, default=defaultconverter))
-    return {"status": "Command completed successfully.", 'SOH': jso}
+    return {"status": "Command completed successfully.", 'MDS': jso}
 
 
 @app_.post("/api/comboindicator")
@@ -126,7 +126,7 @@ async def postkv(request: Request):
     return {"status": "Command is successfully posted."}
 
 
-@app_.get("/")
+# @app_.get("/")
 async def root():
     return {"status": "Restful service is up."}
 

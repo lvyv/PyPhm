@@ -27,7 +27,7 @@ class MqttCliDaemon:
     def run(self):
         while True:
             data = self.pipe_.recv()
-            print(f'process:{data}')
+            # print(f'process:{data}')
             if data == "stop":
                 print(f'close pipe and exit.')
                 self.pipe_.close()
@@ -39,6 +39,10 @@ class MqttCliDaemon:
 
 # 进程函数
 def proc_mqtt(pi, tk, iot, port):
-    svrobj = MqttCliDaemon(pi, tk, iot, port)
-    svrobj.run()
-    del svrobj
+    try:
+        svrobj = MqttCliDaemon(pi, tk, iot, port)
+        svrobj.run()
+        del svrobj
+    except ConnectionRefusedError as cre:
+        print(cre)
+
