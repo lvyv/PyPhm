@@ -16,10 +16,8 @@
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
 """旋转机械健康管理模型.
+单元测试模块
 
-参考:
-  - [1]Neupane D, Seok J. Bearing fault detection and diagnosis using case western reserve university
-  dataset with deep learning approaches: A review[J]. IEEE Access, 2020, 8: 93155-93178.
 """
 
 # Author: Awen <26896225@qq.com>
@@ -101,60 +99,6 @@ class TestPhm(unittest.TestCase):
 
         df = phm.get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et)
         self.assertTrue(len(df) > 0)
-
-
-def analysis_ims():
-    mypath = '../../phm-model/hvac/data/'  # 'data/'
-    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-
-    # Set figure size for matplotlib
-    plt.rcParams['figure.figsize'] = [12, 6]
-    files = onlyfiles  # [0:6]
-
-    data = []
-    for file in files:
-        x = utils.load_dat(file, mypath)
-        data.append(x[0])
-
-    sr = 20480  # sample rate
-    ws = 2048  # window size
-    freqs, spectra = cluster.ts2fft(data, sr, ws)
-    cluster_, df = cluster.cluster_vectors(spectra, False)
-
-    # plot frequencies cluster chart
-    fig, ax = plt.subplots()
-    ax.set_xlabel('Frequency')
-    ax.set_ylabel('Frequency Domain (Spectrum) Magnitude')
-    ax.set_title('Frequency Domain Representation of Each Signal')
-    for idx, elem in enumerate(df['vectors']):
-        for el in elem:
-            ax.plot(freqs, spectra[el], c=df['color'][idx])
-    plt.show()
-
-    df2 = mds.dev_age_compute(spectra, freqs, [28, 12, 52])
-    pos = mds.compute_mds_pos(spectra)
-    # set color for each points in df2
-    df2.loc[:, 'color'] = '#000000'
-    for idx, elems in enumerate(df['vectors']):
-        for el in elems:
-            df2.loc[el, 'color'] = df.loc[idx, 'color']
-
-    # plot mds scatter chart
-    plt.figure(1)
-    plt.axes([0., 0., 1., 1.])
-    plt.scatter(pos[:, 0], pos[:, 1], marker='.', edgecolors=df2.loc[:, 'color'], s=df2.loc[:, 'age'],
-                facecolors='none',
-                alpha=0.5, lw=1, label=df2.loc[:, 'color'])
-    hnds = []
-    for idx, el in enumerate(df['color']):
-        pop = mpatches.Patch(color=el, label=f'cluster:{df["cid"][idx]}, {df["vectors"][idx]}')
-        hnds.append(pop)
-    plt.legend(handles=hnds, prop={'size': 6})
-    txts = df[df['cid'] == -1]['vectors'][0]  # -1 point.
-    texts = [plt.text(pos[txt, 0], pos[txt, 1], txt) for txt in txts]
-    adjust_text(texts)
-    plt.show()
-    return
 
 
 if __name__ == "__main__":
