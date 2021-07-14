@@ -53,9 +53,7 @@ IOTtok_ = 'ZOKriyQPgItNmPbtuxpo'                    # 设备标识 iot的access 
 
 # default value for convenience
 pipe_ = None
-# start_ = datetime.strptime('2008-05-22T20:26:31.383470+08:00', '%Y-%m-%dT%X.%f%z')
 start_ = datetime.fromtimestamp(1209820000)  # 1209820400000(python is based on second while js is ms)
-# start_ = datetime.strftime(start_, '%Y-%m-%dT%X.%f%z')
 delt_ = timedelta(hours=5)
 
 app_ = FastAPI(
@@ -108,35 +106,13 @@ def run(pt):
     uvicorn.run(app_, host="0.0.0.0", port=pt)
 
 
-# @app_.post("/api/mdsdata")  # just for test pupose
-async def mdsdata(item: ComboIndicatorItem):
-    cmd = item.dict()
-    # FIXME:要检查是否传入合适的obj,src,stime,etime
-    cmd['command'] = 'comboindicator'
-
-    ret = phm.fre2soh('http://127.0.0.1/archive/1st_test/1st_test/2003.10.23.00.14.13', '../phm-model/hvac/data/')
-    # phm.compute_mdsdata('../phm-model/hvac/data/', 'http://127.0.0.1/archive/1st_test/1st_test/2003.10.23.00.14.13')
-    jso = ret.to_json()
-    # pipe_.send(json.dumps(cmd, default=defaultconverter))
-    return {"status": "Command completed successfully.", 'MDS': jso}
-
-
 @app_.post("/api/comboindicator")
 async def comboindicator(item: ComboIndicatorItem):
     cmd = item.dict()
     # FIXME:要检查是否传入合适的obj,src,stime,etime
     cmd['command'] = 'comboindicator'
     pipe_.send(json.dumps(cmd, default=defaultconverter))
-    return {"status": "Command completed successfully."}
-
-
-# @app_.post("/api/setupmqtt")
-async def setupmqtt(item: MqttItem):
-    cmd = item.dict()
-    # FIXME:要检查是否传入合适的host和token
-    cmd['command'] = 'setupmqtt'
-    pipe_.send(json.dumps(cmd))
-    return {"status": "Command completed successfully."}
+    return {"status": "Async command successfully issued."}
 
 
 @app_.post("/api/kill")
@@ -144,18 +120,10 @@ async def kill():
     cmd = {"command": 'kill', "desc": 'A kill command from browser.'}
     pipe_.send(json.dumps(cmd))
     self_kill()
-    return {"success": True}
+    return {"Success": True}
 
 
-# @app_.post("/api/postkv")
-async def postkv(request: Request):
-    cmd = await request.json()
-    cmd['command'] = 'postkv'
-    pipe_.send(json.dumps(cmd))
-    return {"status": "Command is successfully posted."}
-
-
-# @app_.get("/")
+@app_.get("/")
 async def root():
     return {"status": "Restful service is up."}
 

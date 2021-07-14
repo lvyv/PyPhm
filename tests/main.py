@@ -25,12 +25,12 @@
 # License: MIT
 
 import json
+import logging
 import multiprocessing as mul
 import phm.modules.mqttworker as mqttworker
 import phm.modules.restworker as restworker
 import phm.phm as phm
 from phm import BENCHPATH
-import logging
 
 
 # setup and cache mqtt connection
@@ -54,7 +54,6 @@ def setup_mqtt(process, param):
 def compute_publish(process, channel, param):
     try:
         if process:
-            # retidx = compute_indicator(param)
             retidx = phm.calculate_mds_indicator(param, BENCHPATH)
             if retidx:
                 for item in retidx:
