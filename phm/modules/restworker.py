@@ -31,10 +31,8 @@ import os
 import psutil
 import json
 import uvicorn
-import phm as phm
-
 from datetime import datetime, timedelta
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from typing import Optional
 from pydantic import BaseModel
 
@@ -120,10 +118,10 @@ async def kill():
     cmd = {"command": 'kill', "desc": 'A kill command from browser.'}
     pipe_.send(json.dumps(cmd))
     self_kill()
-    return {"Success": True}
+    return {"status": "Goodbye."}
 
 
-@app_.get("/")
+# @app_.get("/")
 async def root():
     return {"status": "Restful service is up."}
 
