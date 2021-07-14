@@ -26,6 +26,7 @@ Cluster and fft functions.
 
 # Author: Awen <26896225@qq.com>
 # License: MIT
+import logging
 
 import numpy as np
 import pandas as pd
@@ -71,7 +72,7 @@ def ts2fft(datumn, samplerate, nperseg):
             fre, amp = signal.welch(sig, fs=samplerate, scaling='density', nperseg=nperseg)
             spectrum_list.append(np.abs(amp))
     except BaseException as err:
-        print(err)
+        logging.error(err)
         fre = None
         spectrum_list = []
     return fre, spectrum_list

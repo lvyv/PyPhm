@@ -1,3 +1,5 @@
+import logging
+
 import paho.mqtt.client as mqtt
 
 
@@ -21,7 +23,7 @@ class MqttCliDaemon:
         self.client_ = None
         self.pipe_.close()
         self.pipe_ = None
-        print('Mqtt process exit.')
+        logging.info('Mqtt process exit.')
 
     # receive and publish data to iot
     def run(self):
@@ -29,7 +31,7 @@ class MqttCliDaemon:
             data = self.pipe_.recv()
             # print(f'process:{data}')
             if data == "stop":
-                print(f'close pipe and exit.')
+                logging.info(f'close pipe and exit.')
                 self.pipe_.close()
                 break
             # Sending data to iot
@@ -44,5 +46,5 @@ def proc_mqtt(pi, tk, iot, port):
         svrobj.run()
         del svrobj
     except ConnectionRefusedError as cre:
-        print(cre)
+        logging.info(cre)
 

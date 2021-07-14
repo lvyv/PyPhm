@@ -1,5 +1,7 @@
 import os
 import errno
+import time
+
 import requests
 import json
 import pandas as pd
@@ -11,7 +13,31 @@ from os import listdir
 from os.path import isfile, join
 from phm.modules import utils
 from phm.vibration import cluster, mds
+import paho.mqtt.client as mqtt
+import logging
 import unittest
+
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        logging.info('connected.')
+        client.connected_flag = True
+
+
+def mqtt_publish(host, port, accesstoken, sensor_data):
+    topic = 'v1/devices/me/telemetry'
+    client = mqtt.Client()
+    mqtt.Client.connected_flag = False
+    client.on_connect = on_connect
+    client.username_pw_set(accesstoken)
+    client.connect(host, port, 60)
+    client.loop_start()
+    client.publish(topic, sensor_data, 1)
+    while not client.connected_flag:
+        time.sleep(1)
+    client.loop_stop()
+    client.disconnect()
+    return
 
 
 def get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et):
@@ -49,7 +75,7 @@ def get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et):
             df1 = df1.rename(columns={f'value{key}': key})
         return df1.drop(columns=['value'])
     except Exception as e:
-        print(e)
+        logging.error(e)
         return None
 
 
@@ -72,13 +98,22 @@ def safe_open_w(path):
     return open(path, 'wb')
 
 
-def retrieve_url_file(url, localfile):
-    # print(url)
-    r = requests.get(url)
-    if r.status_code == 200:
-        with safe_open_w(localfile) as f:
-            f.write(r.content)
-    return r.status_code
+def retrieve_url_file(url, localdir):
+    ret = -1        # initial err value.
+    fn = os.path.basename(url)
+    local = f'{localdir}{fn}'
+    if os.path.isfile(local):
+        ret = -2    # file already downloaded.
+    elif os.path.isdir(local):
+        ret = -3    # url path ends at / and fn=''.
+    else:
+        r = requests.get(url)
+        if r.status_code == 200:
+            with safe_open_w(local) as f:
+                f.write(r.content)
+                f.close()
+                ret = r.status_code  # ret = 200 is fine.
+    return ret
 
 
 def fre2mds(url, benchpath, cachepath='.cache/data/'):
@@ -105,7 +140,10 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
     sr = 20480  # sample rate
     ws = 2048  # window size
 
-    # 1.read benchamark data files
+    # 1.download the dat file if necessary.
+    retrieve_url_file(url, cachepath)
+
+    # 2.read benchamark data files
     datumn = []
     mypath = benchpath
     onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
@@ -124,13 +162,7 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
     agelist = [28, 12, 52]  # FIXME: The benchmark datasets originally include three run to failure tests.
     objpos = len(datumn)    # This position should be used to plot object sample.
-    print(f'1.Benchmark data read: {objpos}')
-
-    # 2.download the dat file if necessary.
-    fn = url.rsplit('/', 1)[-1]
-    local = f'{cachepath}{fn}'
-    if not os.path.exists(local):
-        retrieve_url_file(url, local)
+    logging.info(f'1.Benchmark data read: {objpos}')
 
     # 3.read obj data files
     mypath = cachepath  # Obj data from url, cached in local .cache directory.
@@ -146,7 +178,7 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
                 datumn.append(seg)
                 fractionlet += 1
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-    print(f'2.Total points(include obj ones): {len(datumn)}')
+    logging.info(f'2.Total points(include obj ones): {len(datumn)}')
 
     # 4.fft and cluster
 
@@ -161,12 +193,11 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
     for idx, elems in enumerate(dfnew['vectors']):
         for el in elems:
             df2.loc[el, 'color'] = dfnew.loc[idx, 'color']
-    print(f'3.MDS pos computed.')
+    logging.info(f'3.MDS pos computed.')
 
     # plot mds scatter chart
     plt.figure(1)
     plt.axes([0., 0., 1., 1.])
-    # print(f'Total {len(agelist)} cnts samples loaded.')
     # collections = list(range(len(pos)))
     # mask = dfnew[dfnew['cid'] == -1]['vectors'][0]
     # dispindices = list(set(collections).difference(set(mask)))
@@ -213,14 +244,14 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
     for txt in list(range(objpos, len(datumn))):
         plt.text(pos[txt, 0], pos[txt, 1], f'PT: {txt}', c='#000000')
     plt.show()
-    print('4.MDS plot finished.')
+    logging.info('4.MDS plot finished.')
     df2.drop(df2.columns[list(range(len(df2.T)-3))], axis=1, inplace=True)
     df2['pos_x'] = pos[:, 0]
     df2['pos_y'] = pos[:, 1]
     df2['shape'] = 0
     df2.loc[objpos:, 'shape'] = 1
     json.loads(df2.to_json())
-    print('5.Return to main procedure.')
+    logging.info('5.Return to main procedure.')
     return df2.to_json()    # return a valid json string
 
 
@@ -252,7 +283,7 @@ def calculate_mds_indicator(modelparam, bp):
             if modelparam['obj'] == 'MDS':
                 idx = wrap_mds(df, bp)
     except ValueError as ve:
-        print('Exception occured.', ve)
+        logging.error('Exception occured.', ve)
         pass
     return idx
 
@@ -304,7 +335,7 @@ def compute_mdsdata(benchpath, objpath):
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
     agelist = [28, 12, 52]  # FIXME: The benchmark datasets originally include three run to failure tests.
     objpos = len(datumn)    # This position should be used to plot object sample.
-    print(f'Benchmark data read {objpos} cnts of points.')
+    logging.info(f'Benchmark data read {objpos} cnts of points.')
 
     # 3.read obj data files
     mypath = cachepath  # Obj data from url, cached in local .cache directory.
@@ -320,7 +351,7 @@ def compute_mdsdata(benchpath, objpath):
                 datumn.append(seg)
                 fractionlet += 1
         agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-    print('Total points(include obj ones): ', len(datumn))
+    logging.info('Total points(include obj ones): ', len(datumn))
 
     # 4.fft and cluster
 
@@ -330,7 +361,7 @@ def compute_mdsdata(benchpath, objpath):
     df2 = mds.dev_age_compute(spectrum, frequencies, agelist)  # should label at data reading phase.seg
     pos = mds.compute_mds_pos(spectrum)
 
-    print(f'MDS pos computed.')
+    logging.info(f'MDS pos computed.')
 
     # set color for each points in df2
     df2.loc[:, 'color'] = '#000000'
@@ -341,7 +372,7 @@ def compute_mdsdata(benchpath, objpath):
     # plot mds scatter chart
     plt.figure(1)
     plt.axes([0., 0., 1., 1.])
-    print(f'Total {len(agelist)} cnts samples loaded.')
+    logging.info(f'Total {len(agelist)} cnts samples loaded.')
     # collections = list(range(len(pos)))
     # mask = dfnew[dfnew['cid'] == -1]['vectors'][0]
     # dispindices = list(set(collections).difference(set(mask)))
@@ -390,7 +421,7 @@ def compute_mdsdata(benchpath, objpath):
         plt.text(pos[txt, 0], pos[txt, 1], f'Object {txt}', c='#000000')
 
     plt.show()
-    print('---over---')
+    logging.info('---over---')
 
     return 1
 
