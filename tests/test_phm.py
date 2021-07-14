@@ -1,6 +1,30 @@
 #!/usr/bin/env python
+# Copyright 2021 The CASICloud Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+# pylint: disable=invalid-name
+# pylint: disable=missing-docstring
+"""旋转机械健康管理模型.
 
-"""Tests for `phm` package."""
+参考:
+  - [1]Neupane D, Seok J. Bearing fault detection and diagnosis using case western reserve university
+  dataset with deep learning approaches: A review[J]. IEEE Access, 2020, 8: 93155-93178.
+"""
+
+# Author: Awen <26896225@qq.com>
+# License: MIT
+
 import json
 import logging
 import unittest
@@ -131,123 +155,6 @@ def analysis_ims():
     adjust_text(texts)
     plt.show()
     return
-
-
-def analysis_cwru():
-    logging.info('---start---')
-    sr = 12000
-    ws = 2048
-
-    datumn = []
-    mypath = '../../phm-model/hvac/data/baseline/'
-    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-
-    chunksize = 20480
-    agelist = []
-    for i, item in enumerate(onlyfiles):
-        fractionlet = 0  # some segment is too short and should be drop out.
-        file = item.split('.')[0]
-        (de, fe) = utils.load_mat(file, mypath)
-        # segment by chunksize(default 20480)
-        for idx, subset in enumerate(range(0, len(de), chunksize)):
-            seg = de[subset: subset + chunksize]
-            if len(seg) > ws:
-                datumn.append(seg)
-                fractionlet += 1
-        agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-    logging.info(f'Total {len(datumn)} cnts of health points loaded.')
-
-    mypath = '../../phm-model/hvac/data/fault/'  # 'data/fault/'
-    onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-
-    for i, item in enumerate(onlyfiles):
-        fractionlet = 0  # some segment is too short and should be drop out.
-        file = item.split('.')[0]
-        (de, fe) = utils.load_mat(file, mypath)
-        # segment by chunksize(default 20480)
-        for idx, subset in enumerate(range(0, len(de), chunksize)):
-            seg = de[subset: subset + chunksize]
-            if len(seg) > ws:
-                datumn.append(seg)
-                fractionlet += 1
-        agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-
-    logging.info('Total points(include health ones): ', len(datumn))
-
-    frequencies, spectrum = cluster.ts2fft(datumn, sr, ws)
-    clusternew_, dfnew = cluster.cluster_vectors(spectrum, False)
-
-    # plot frequencies cluster chart
-    fig, ax = plt.subplots()
-    ax.set_xlabel('Frequency')
-    ax.set_ylabel('Frequency Domain (Spectrum) Magnitude')
-    ax.set_title('Frequency Domain Representation of Each Signal')
-    for idx, elem in enumerate(dfnew['vectors']):
-        for el in elem:
-            ax.plot(frequencies, spectrum[el], c=dfnew['color'][idx])
-    plt.show()
-
-    df2 = mds.dev_age_compute(spectrum, frequencies, agelist)  # should label at data reading phase.seg
-    pos = mds.compute_mds_pos(spectrum)
-
-    logging.info(f'MDS pos computed.')
-
-    # set color for each points in df2
-    df2.loc[:, 'color'] = '#000000'
-    for idx, elems in enumerate(dfnew['vectors']):
-        for el in elems:
-            df2.loc[el, 'color'] = dfnew.loc[idx, 'color']
-
-    # plot mds scatter chart
-    plt.figure(1)
-    plt.axes([0., 0., 1., 1.])
-    logging.info(f'Total {len(agelist)} cnts of health points loaded.')
-    collections = list(range(len(pos)))
-    mask = dfnew[dfnew['cid'] == -1]['vectors'][0]
-    dispindices = list(set(collections).difference(set(mask)))
-    plt.scatter(x=pos[dispindices, 0],
-                y=pos[dispindices, 1],
-                s=df2.loc[dispindices, 'age'],
-                label=df2.loc[dispindices, 'color'],
-                edgecolors=df2.loc[dispindices, 'color'],
-                facecolors='none', marker='.', alpha=0.5, lw=1)
-    hnds = []
-    for idx, el in enumerate(dfnew['color']):
-        pop = mpatches.Patch(color=el, label=f'cluster:{dfnew["cid"][idx]}, {len(dfnew["vectors"][idx])}')
-        hnds.append(pop)
-    plt.legend(handles=hnds, prop={'size': 6})
-    # label baseline points
-    # baseline should be the first points
-    # agelist = [24, 12, 24, 24, 6, ...]
-    # dfnew:
-    #       cid,       vectors
-    #        -1     [84,85,86,87, ...]
-    #         0     [156,157, ...]
-    #        ...
-    #         8     [0,1,2, ...]
-    # should label points: 0, 24, 36, 60
-    blcnts = 3
-    baselineclass = [0]
-    for idx, el in enumerate(agelist[0: blcnts]):
-        ps = baselineclass[idx] + el
-        baselineclass.append(ps)
-    # find baselineclass leader points in dfnew and
-    texts = []
-    for obj in baselineclass:   # 0, 24, 36, 60
-        for idx, vecs in enumerate(dfnew['vectors']):
-            if obj in vecs:
-                txt = dfnew['cid'][idx]
-                texts.append(plt.text(pos[obj, 0], pos[obj, 1], txt))
-    adjust_text(texts)
-    # try:
-    #     txts = dfnew[dfnew['cid'] == -1]['vectors'][0]  # -1 point.
-    #     texts = [plt.text(pos[txt, 0], pos[txt, 1], txt) for txt in txts]
-    #     adjust_text(texts)
-    # except KeyError as ke:
-    #     logging.info(ke)
-    #     pass
-    plt.show()
-    logging.info('---over---')
 
 
 if __name__ == "__main__":

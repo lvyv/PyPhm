@@ -21,6 +21,9 @@
   dataset with deep learning approaches: A review[J]. IEEE Access, 2020, 8: 93155-93178.
 """
 
+# Author: Awen <26896225@qq.com>
+# License: MIT
+
 import json
 import multiprocessing as mul
 import phm.modules.mqttworker as mqttworker

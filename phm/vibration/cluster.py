@@ -26,8 +26,8 @@ Cluster and fft functions.
 
 # Author: Awen <26896225@qq.com>
 # License: MIT
-import logging
 
+import logging
 import numpy as np
 import pandas as pd
 import hdbscan
