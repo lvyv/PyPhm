@@ -189,7 +189,7 @@ def fre2mds(url, benchpath, cachepath='.cache/data/'):
                     datumn.append(seg)
                     fractionlet += 1
             agelist.append(fractionlet)  # each chunk contains idx+1 segments.
-        agelist = [28, 12, 52]  # FIXME: The benchmark datasets originally include three run to failure tests.
+        # agelist = [28, 12, 52]  # FIXME: The benchmark datasets originally include three run to failure tests.
         objpos = len(datumn)  # This position should be used to plot object sample.
         logging.info(f'1.Benchmark data read: {objpos}')
 

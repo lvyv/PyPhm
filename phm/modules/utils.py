@@ -32,18 +32,13 @@ import scipy.fftpack
 import scipy.io
 
 
-def load_dat(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
-    strf = f'{path}{file}'
-    df = pd.read_table(strf, names=ns)
-    c1 = df.iloc[:, 0].values
-    c2 = df.iloc[:, 1].values
-    return c1, c2
-
-
 def load_mat(file, path):
     strf = f'{path}{file}'
     data = scipy.io.loadmat(strf)
-    fid = '{:0>3}'.format(file)  # 99 --> 099
+    # fid = '{:0>3}'.format(file)  # 99 --> 099
+    fileid = [int(si) for si in file.split('.') if si.isdigit()][0]  # xx.97.mat now changed to 97
+    width = 3
+    fid = f'{fileid:0{width}d}'  # 97 -> 097, and 100 -> 100
     de = data[f'X{fid}_DE_time']
     fe = data[f'X{fid}_FE_time']
     # drive end amplitude
@@ -56,4 +51,17 @@ def load_mat(file, path):
         ampfe.append(fe[i][0])
 
     return ampde, ampfe
+
+
+def load_csv(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
+    strf = f'{path}{file}'
+    df = pd.read_table(strf, names=ns)
+    c1 = df.iloc[:, 0].values
+    c2 = df.iloc[:, 1].values
+    return c1, c2
+
+
+def load_dat(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
+    # return load_csv(file, path, ns)
+    return load_mat(file, path)
 

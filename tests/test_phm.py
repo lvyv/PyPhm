@@ -27,14 +27,7 @@ import json
 import logging
 import unittest
 import shutil
-import matplotlib.pyplot as plt
 import phm.phm as phm
-from adjustText import adjust_text
-from matplotlib import patches as mpatches
-from os import listdir
-from os.path import isfile, join
-from phm.modules import utils
-from phm.vibration import cluster, mds
 from datetime import datetime
 
 
@@ -100,8 +93,23 @@ class TestPhm(unittest.TestCase):
         df = phm.get_iot_data(iot, usr, pwd, entitytype, entityid, keys, st, et)
         self.assertTrue(len(df) > 0)
 
+    def test_cwru(self):
+        """Test phm.get_iot_data."""
+        param = 'http://192.168.101.19:8000/fault/105.mat'
+        bpath = '../../phm-model/hvac/data/baseline/'
+        df = phm.fre2mds(param, bpath)
+
+    def test_ims(self):
+        """Test phm.get_iot_data."""
+        param = 'http://192.168.101.19:8000/2004.04.01.00.01.57'
+        bpath = '../data/'
+        df = phm.fre2mds(param, bpath)
+
 
 if __name__ == "__main__":
-    unittest.main()
-    # analysis_ims()
-    # analysis_cwru()
+    # unittest.main()
+    suite = unittest.TestSuite()
+    # suite.addTest(TestPhm('test_ims'))
+    suite.addTest(TestPhm('test_cwru'))
+    unittest.TextTestRunner().run(suite)
+
