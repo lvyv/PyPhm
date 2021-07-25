@@ -62,6 +62,6 @@ def load_csv(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
 
 
 def load_dat(file, path, ns=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']):
-    # return load_csv(file, path, ns)
-    return load_mat(file, path)
+    return load_csv(file, path, ns)
+    # return load_mat(file, path)
 
