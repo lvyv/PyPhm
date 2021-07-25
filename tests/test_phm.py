@@ -109,7 +109,7 @@ class TestPhm(unittest.TestCase):
 if __name__ == "__main__":
     # unittest.main()
     suite = unittest.TestSuite()
-    # suite.addTest(TestPhm('test_ims'))
-    suite.addTest(TestPhm('test_cwru'))
+    suite.addTest(TestPhm('test_ims'))
+    # suite.addTest(TestPhm('test_cwru'))
     unittest.TextTestRunner().run(suite)
 

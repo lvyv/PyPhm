@@ -29,8 +29,8 @@ import multiprocessing as mul
 import phm.modules.mqttworker as mqttworker
 import phm.modules.restworker as restworker
 import phm.phm as phm
-from phm import BENCHPATH
 import logging
+from phm import BENCHPATH
 
 
 # setup and cache mqtt connection
