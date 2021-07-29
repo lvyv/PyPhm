@@ -42,7 +42,7 @@ from pydantic import BaseModel
 RSTport_ = 29054                                    # 模型微服务监听端口
 
 IOTmqpt_ = 1883                                     # 物联网mqtt端口
-IOTuri_ = '192.168.1.202:8090'                      # 物联网http地址及端口
+IOTuri_ = 'test.mosquitto.org'                      # 物联网http地址及端口
 IOTusr_ = 'user_battery@beidouapp.com'              # 物联网用户
 IOTpwd_ = '12345'                                   # 物联网密码
 IOTdev_ = 'e70e35a0-dd37-11eb-af5e-ebc2cd1145ee'    # 设备标识 iot的device id, Chiller-01
